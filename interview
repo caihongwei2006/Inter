@@ -1,0 +1,291 @@
+后端核心基础（必答）
+- TCP 与 UDP 的核心差异是什么？HTTP 为何选择基于 TCP 协议？
+TCP通过三次握手建立连接，同时通过附加控制信息保证数据传输完成。UDP则不确认连接与数据丢失（缺少控制信息），适用于直播。
+比方：tcp类似于打电话，但udp不确认链接。--udp不是面向链接的协议。
+HTTP选择tcp，因为其需要稳定的传输
+
+- HTTPS 的实现原理
+https在http和tcp中间进行了一次加密
+
+- 设计一个 RESTful API 时需遵循哪些核心原则？
+不知道。
+
+- 数据库索引的实现机制是什么？B+ 树相比 B 树的优势是什么？
+----本题查询之后快速了解了一下，但答案是个人的总结。
+数据库索引实现机制就是B+树与B树。
+b+树只有叶子节点会存数据，每层的节点中间都会有连接以指向下一个节点，减少了回溯操作消耗的时间
+
+- 什么是事务的 ACID 特性？如何保证事务的原子性？
+a是原子性atomic，c是一致性concurrency，i是独立性indemendency，d是持久性durability。保证原子性就是使事务中所有语句同时成功（commit）或失败（rollback）
+
+- 进程和线程的区别是什么？Linux 中如何查看进程信息？
+进程可以有多个线程。同一个进程中的线程可以共享资源，不同进程一般难以共享资源。利用top指令
+进程是资源的资源的最小分配单位
+
+- 分库分表的策略有哪些？如何解决分表后的跨表查询问题？
+按照业务，比如分离用户基本信息和收藏信息；分离物品基本信息，标签信息，sku信息等。
+按照名称哈希值对特定值取模。
+etc。
+分表后，可以通过手动连接sql语句等方法查询到由于数据量过大产生的分表；存储目的不同导致的分表可以在中间建立一个映射表。或者使用某些框架的高级映射。一些常用数据存入中间件
+
+
+
+
+
+Golang核心基础（除必答外可不答）
+  - 并发安全性（必答）
+    - 问题：解释并发安全性，如何通过互斥锁、通道、原子操作实现？
+对于一个协程，可使其获得锁，在该协程结束后释放。期间其涉及的资源会被锁保护，相关协程阻塞，等待锁被释放。
+通道便于协程之间传值，传递信号。尤其是生产者-消费者模式
+原子操作适用于简单的递增递减操作
+
+    - 延伸：读写锁（RWMutex）适用场景？sync.Map与普通Map的线程安全差异？
+sync,RWMutex运用了zookeeper的理念，允许读的并发执行，但是写操作会独占锁。适用于读操作远大于写操作的情况
+普通map使用单线程下的高效访问。sync.Map是线程安全的，其本身包含一个只读map和一个脏map，读写分离
+
+
+  - 值类型与引用类型
+    - 问题：Go中哪些类型是值类型（如数组、结构体）？哪些是引用类型（如切片、map、channel）？内存分配差异？
+引用类型的典型是：map,channel, interface, slice, 其余绝大部分情况我认为是值类型。
+
+
+  - defer机制（必答）
+    - 问题：defer的执行顺序？如何用defer实现资源释放和panic捕获？延迟函数的参数求值时机？
+-------本题目查询后自己总结得到答案。
+defer是golang的延迟调用机制，在正常返回或者panic时发动。
+若 defer A() defer B() defer C()  实际发动顺序为C B A
+获取资源后立刻defer，打开文件后立刻defer，
+defer搭配recover(), 在panic后依然，recover()会捕获到panic的值，程序优雅退出。----但是recover需在defer内调用才行
+
+
+  - 接口与反射
+    - 问题：接口的动态类型如何比较？反射获取结构体Tag的原理？
+接口具有动态类型和动态值两个部分
+一个具体类型被赋给接口时，两个部分都会被填充。   比较方式可以直接比较，通过==检查某个类型是否为某具体类型
+nil 接口：如果接口未被赋值（即类型和值都是 nil），它等于 nil。
+非 nil 值与 nil 接口：如果接口包裹了一个 nil 值（比如 *int 类型的值是 nil），它的动态类型非 nil，因此不等于 nil 接口。
+不可比较类型：如果动态类型本身是不可比较的（如 slice、map、func），直接比较接口会引发 panic，除非两个接口都是 nil。
+
+反射获取结构体tag， tag是结构体内元数据，用反引号定义。其余不知。
+
+
+  - Context （必答）
+    - 问题：设计的目的是什么？常用的 context 的应用场景？
+context是一个统一的接口，提供多个方法。常见的有.BackGround, .TODO, .WithCancel, .WithValue
+便于goroutine灵活地传递信号，不用每次写channel   通过Done 传递信号结合channel，简洁高效。
+
+
+
+
+
+中间件与系统设计（除必答外可不答）
+  1. MySQL 应用题（必答）
+    - 用户分数统计
+      有一个用户科目分数表 id/user_id/course_id/score,每个人均有2门课程,请写出以下sql
+      - 总分数最高的人
+SELECT user_id, SUM(score) AS total_score
+FROM user_course_scores
+GROUP BY user_id
+ORDER BY total_score DESC
+LIMIT 1;
+      - 总分大于150分，平均分小于90分的人数有几个
+SELECT COUNT(*) AS count
+FROM (
+    SELECT user_id, SUM(score) AS total_score, AVG(score) AS avg_score
+    FROM user_course_scores
+    GROUP BY user_id
+    HAVING total_score > 150 AND avg_score < 90
+) AS filtered_users;
+      - 每科满分 100 分，统计每科优/良/及格/未及格的人数
+SELECT 
+    course_id,
+    SUM(CASE WHEN score >= 90 THEN 1 ELSE 0 END) AS excellent,
+    SUM(CASE WHEN score >= 80 AND score < 90 THEN 1 ELSE 0 END) AS good,
+    SUM(CASE WHEN score >= 60 AND score < 80 THEN 1 ELSE 0 END) AS pass,
+    SUM(CASE WHEN score < 60 THEN 1 ELSE 0 END) AS fail
+FROM user_course_scores
+GROUP BY course_id;
+    - 相似收藏夹
+      在一个内容推荐平台中，用户创建并管理自己的收藏夹(可多个)。平台需要设计一个算法，能够衡量不同收藏夹之间的相似度，从而为用户推荐相关的收藏夹。
+      问题描述
+      给定一个目标收藏夹 A 和平台上的其他收藏夫 B，设计一个相似度算法，能够量化这些收藏夹的相似程度。
+      算法要求
+      1. 相似度计算需要考虑以下因素：
+        - 两个收藏夹的共同作品数量
+        - 共同作品在总作品中的比例
+        - 对不同层级的收藏夹进行区分
+      2. 相似度分数计算公式为：
+相似度 = (y + (y/x)) / (2n)
+其中：
+x = 目标收藏夹 B 的总作品数
+y = 目标收藏夹 A 和 B 的共同作品数
+n = 目标收藏夹 A 的作品总数
+      实现要求：
+      - 建表语句以及取某个收藏夹相似的收藏夹 top 10 的 sql
+-------------------本题目由查询后得到答案。
+-- 收藏夹表
+CREATE TABLE collections (
+    collection_id INT PRIMARY KEY,        -- 收藏夹唯一 ID
+    user_id INT,                          -- 创建该收藏夹的用户 ID
+    level INT,                            -- 收藏夹层级（区分不同层级）
+    name VARCHAR(255),                    -- 收藏夹名称（可选）
+    created_at TIMESTAMP                  -- 创建时间（可选）
+);
+
+-- 收藏夹作品关联表
+CREATE TABLE collection_items (
+    id INT PRIMARY KEY AUTO_INCREMENT,    -- 记录 ID
+    collection_id INT,                    -- 收藏夹 ID
+    item_id INT,                          -- 作品 ID
+    FOREIGN KEY (collection_id) REFERENCES collections(collection_id)
+);
+-- 为性能优化添加索引
+CREATE INDEX idx_collection_items_collection_id ON collection_items(collection_id);
+CREATE INDEX idx_collection_items_item_id ON collection_items(item_id);
+
+
+
+
+  2. Redis高频场景
+    - 常见的数据类型以及应用场景（必答） 
+string hash list set hashed set stream
+    - 缓存穿透/雪崩/击穿的解决方案
+    - 分布式锁实现
+    - 注册发送验证码的场景，实现每个自然日最多发送 5 条（必答）
+----------本体在查询下完成
+package main
+
+import (
+    "context"
+    "fmt"
+    "time"
+    "github.com/go-redis/redis/v8"
+)
+
+const (
+    maxAttemptsPerDay = 5               每天最大发送次数次
+    keyTTL            = 24 * time.Hour //    键过期时间（24小时）
+)
+var rdb = redis.NewClient(&redis.Options{
+    Addr: "localhost:6379",                      
+
+func sendVerificationCode(userID string) (bool, error) {
+    ctx := context.Background()
+    date := time.Now().Format("20060102")
+    key := fmt.Sprintf("verify_code_count:%s:%s", userID, date)
+
+    // 尝试增加计数（原子操作）
+    count, err := rdb.Incr(ctx, key).Result()
+    if err != nil {
+        return false, fmt.Errorf("redis incr error: %v", err)
+    }
+
+    // 如果是第一次计数，设置过期时间
+    if count == 1 {
+        err = rdb.Expire(ctx, key, keyTTL).Err()
+        if err != nil {
+            return false, fmt.Errorf("redis expire error: %v", err)
+        }
+    }
+
+    // 检查是否超过限制
+    if count > maxAttemptsPerDay {
+        return false, fmt.Errorf("exceeded daily limit of %d attempts", maxAttemptsPerDay)
+    }
+
+    // TODO: 这里调用实际的验证码发送逻辑（如短信或邮件）
+    fmt.Printf("Sending verification code to user %s, attempt %d\n", userID, count)
+    return true, nil
+}
+
+func main() {
+    // 示例：模拟用户请求验证码
+    userID := "user123"
+    for i := 1; i <= 7; i++ {
+        success, err := sendVerificationCode(userID)
+        if err != nil {
+            fmt.Printf("Attempt %d failed: %v\n", i, err)
+        } else {
+            fmt.Printf("Attempt %d succeeded\n", i)
+        }
+    }
+}
+
+
+    - 注册发送验证码的场景，实现任意 24h的时间滑块最多发送 5 条（必答）
+----------本题在上一题基础上举一反三得到
+package main
+
+import (
+    "context"
+    "fmt"
+    "time"
+    "github.com/go-redis/redis/v8"
+)
+
+const (
+    maxAttemptsSliding = 5              // 滑动窗口最大发送次数
+    windowSize         = 24 * time.Hour // 滑动窗口大小（24小时）
+)
+
+var rdb = redis.NewClient(&redis.Options{
+    Addr: "localhost:6379",
+})
+func sendVerificationCodeSliding(userID string) (bool, error) {
+    ctx := context.Background()
+    key := fmt.Sprintf("verify_code_sliding:%s", userID)
+    now := time.Now()
+    cutoff := now.Add(-windowSize).Unix() // 24小时前的截止时间
+
+                                                                        // 移除过期记录（早于24小时前）
+    _, err := rdb.ZRemRangeByScore(ctx, key, "0", fmt.Sprintf("%d", cutoff)).Result()
+    if err != nil {
+        return false, fmt.Errorf("redis zremrangebyscore error: %v", err)
+    }
+
+    // 获取当前窗口内的发送次数
+    count, err := rdb.ZCard(ctx, key).Result()
+    if err != nil {
+        return false, fmt.Errorf("redis zcard error: %v", err)
+    }
+    if count >= maxAttemptsSliding {//超限不再发送
+        return false, fmt.Errorf("超出发送的 %d 次限制", maxAttemptsSliding)
+    }
+
+另外 添加当前发送记录（时间戳作为分数和成员）
+    timestamp := now.Unix()
+    err = rdb.ZAdd(ctx, key, &redis.Z{
+        Score:  float64(timestamp),
+        Member: timestamp,     }).Err()
+    if err != nil {
+        return false, fmt.Errorf("redis zadd error: %v", err)
+    }
+    fmt.Printf("Sending verification code to user %s, current count: %d\n", userID, count+1)
+    return true, nil
+}
+
+func main() {
+    userID := "user123"
+    for i := 1; i <= 7; i++ {
+        success, err := sendVerificationCodeSliding(userID)
+        if err != nil {
+            fmt.Printf("Attempt %d failed: %v\n", i, err)
+        } else {
+            fmt.Printf("Attempt %d succeeded\n", i)
+        }
+        time.Sleep(1 * time.Second)     }
+}
+
+  3. Kafka核心机制
+    - 如何保证消息顺序性？（必答）
+卡夫卡的存储是基于磁盘的，分作多个partition顺序append，分区内有唯一的offset偏移量，跟踪消费进度
+而partition的进入，是由哈希算法决定的。
+    - 消费者组Rebalance触发场景？
+    - 零拷贝技术如何提升吞吐？
+  4. Elasticsearch优化
+    - 倒排索引原理？（必答）
+没有用过。
+    - 深分页性能问题如何解决（Search After vs Scroll）？
+  5. 系统设计实战
+    - 设计千级QPS的秒杀系统，需包含库存扣减（Redis+Lua）、限流熔断（令牌桶）、异步削峰（Kafka）
+
