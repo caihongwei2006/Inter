@@ -298,7 +298,18 @@ func main() {
     - 场景：10GB文件内存仅1GB，如何分治排序？考察外部排序与IO优化
   - 数组去重
     - 有个 int 类型的数组，想实现数组内去重，并保留原有排序
----------------------不会该方面内容
+func removeDuplicates(nums []int) []int {
+    seen := make(map[int]bool) 
+    result := []int{}          
+    for _, num := range nums {
+        if !seen[num] {        
+            result = append(result, num) 
+            seen[num] = true            
+        }
+    }
+    return result
+}
+
 ---
 进阶原理与调优（可只选择一个题目回答）
   1. GC机制
